@@ -1,0 +1,302 @@
+---
+title: "Understanding Methane and Carbon Dioxide Fluxes in the Mackenzie River Delta"
+author:
+  - name: June Skeeter
+    affiliations:
+      - Geological Survey of Canada, Natural Resources Canada
+  - name: Peter Morse
+    affiliations:
+      - Geological Survey of Canada, Natural Resources Canada
+date: May 7, 2025
+format:
+  docposter-html:
+    link-citations: false
+    fill-page: true
+    embed-resources: true  # self_contained flag is now deprecated in favor of embed-resources
+    css: _extensions/jskeeter/docposter/drposter.css
+csl: Resources/nature.csl
+bibliography: CANCH4.bib
+jupyter: python3
+hlogo2: images/logo_CanCH4.png
+hlogo1: images/logo_NRCAN.jpg
+flogo1: images/logo_CA.jpg
+---
+
+```{python}
+#| echo: false
+
+labelFontSize = 22
+```
+
+
+# {.col-3}
+
+## Overview 
+
+The Mackenzie River Delta in the Northwest Territories is the Arctic’s second largest river delta and is of particular concern with regard to methane emissions because methane hotspots” have been detected by multiple aerial surveys, which are attributable to geologic methane seeps and/or to biologic methane emissions from its expansive wetland areas, both of which have the potential to increase with permafrost degradation due to climate change. @kohnert_strong_2017@skeeter_controls_2022@wesley_characterization_2023
+
+
+
+## Background
+
+<div id="noflex">
+Eddy covariance (EC) is one of the primary methods to monitor landscape-scale greenhouse gas exchange and understand the dynamics controlling gas exchange over time.  
+
+* The method involves measuring high-frequency (10-20 Hz) 3-D wind velocity and gas concentrations.
+* Given assumptions are met (e.g., stationary) high frequency data are processed to estimate mean half-hourly flux densities.
+
+### Limited Arctic Flux Observations
+
+There is sparse coverage of EC stations in the Arctic, outside of Scandinavia and Alaska as shown in @fig-pan-arc.
+
+* EC stations are are difficult to opperate in remote environments due to maintenance and power demands.
+* Sites measuring CH<sub>4</sub> are even less common.
+
+```{python}
+#| echo: false
+#| label: fig-pan-arc
+#| fig-cap: "Eddy covariance sites above of 60&deg;N with at least one season of data. @pallandt_representativeness_2021"
+#| fig-width: 100%
+
+import pandas as pd
+import geopandas as gpd
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+import matplotlib.patches as mpatches
+import map_elements as me
+from shapely.geometry import Polygon
+import numpy as np
+import pyproj
+
+
+custom_laea = '+proj=laea +lat_ts=0 +lat_0=90 +lon_0=-90 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs'
+
+## Define bounds
+N = 360
+AC = 66.33
+N60 = 60
+lat_point_list = np.ones(N)*AC
+lon_point_list = np.linspace(-180,180,N)
+
+
+bigLine = 5
+littleLine = 3
+# North of 60 + Arctic Circle
+# polygon_geom = Polygon(zip(lon_point_list, lat_point_list))
+LatLines = [60,66.33]
+geom = [
+  Polygon(zip(np.linspace(-180,180,N),np.ones(N)*Lat)) for Lat in LatLines
+]
+LatLines = gpd.GeoDataFrame(index=LatLines, crs='WGS84', geometry=geom)   
+LatLines = LatLines.to_crs(custom_laea)
+
+
+lat_point_list = [70.0,70.0,67.5,67.5]
+lon_point_list = [-137.0,-132.25,-132.25,-137.0]
+
+polygon_geom = Polygon(zip(lon_point_list, lat_point_list))
+deltaBounds = gpd.GeoDataFrame(index=[0], crs='WGS84', geometry=[polygon_geom])   
+deltaBounds = deltaBounds.to_crs(custom_laea)
+
+source = 'Data/'
+Sites = pd.read_csv(source+'Arctic_EC_Towers.csv')
+Sites = gpd.GeoDataFrame(Sites,geometry=gpd.points_from_xy(Sites.Longitude, Sites.Latitude),crs='WGS1984')
+Sites = Sites.to_crs(custom_laea)
+Sites = gpd.clip(Sites,LatLines.loc[LatLines.index==60])
+
+coast = gpd.read_file(source+'cp_coast_la.shp').to_crs(custom_laea)
+coast = gpd.clip(coast,LatLines.loc[LatLines.index==60])
+Arctic = coast.loc[coast['WATER']<=1].dissolve()
+land = coast.loc[coast['COUNTRY']!='wa'].dissolve(by='COUNTRY')
+ocean = coast.loc[coast['COUNTRY']=='wa']
+
+fig,ax=plt.subplots(figsize=(15,15))
+land.plot(ax=ax,color='tan')
+TL_kwargs = {'color':'None',
+  'edgecolor':'green',
+  'linewidth':littleLine,
+  'label':'Arctic Treeline',
+  'linestyle':':'}
+Arctic.plot(ax=ax,**TL_kwargs)
+ocean.plot(ax=ax,color='lightblue')
+land.plot(ax=ax,facecolor='None',edgecolor='k')
+LatLines.loc[LatLines.index==60].plot(ax=ax,facecolor='None',edgecolor='k',linewidth=bigLine)
+
+AC_kwargs = {
+  'color':'None',
+  'edgecolor':'k',
+  'linestyle':'--',
+  'label':'Arctic Circle',
+  'linewidth':littleLine
+}
+LatLines.loc[LatLines.index==66.33].plot(ax=ax,**AC_kwargs)
+
+db_kwargs={
+  'color':'None',
+  'edgecolor':'red',
+  'linewidth':littleLine,
+  'label':'Mackenzie Delta'
+}
+
+deltaBounds.plot(ax=ax,**db_kwargs)
+
+legend_elements = []
+
+
+color = 'grey'
+label = 'Only CO$_2$'
+marker = 's'
+MS = 150
+kwargs={'color':color,'marker':marker,'markersize':MS,'edgecolor':'k'}
+Sites.loc[((Sites['CH4']==False))].plot(ax=ax,**kwargs)
+kwargs={'color':'w','markeredgecolor':'k','markerfacecolor':color,'marker':marker,'markersize':MS/10,'label':label}
+legend_elements.append(Line2D([0], [0],**kwargs))
+
+label = 'CO$_2$ & CH$_4$'
+marker = 'o'
+color = 'blue'
+kwargs={'color':color,'marker':marker,'markersize':MS,'edgecolor':'k'}
+Sites.loc[((Sites['CH4']==True))].plot(ax=ax,**kwargs)
+
+kwargs={'color':'w','markeredgecolor':'k','markerfacecolor':color,'marker':marker,'markersize':MS/10,'label':label}
+legend_elements.append(Line2D([0], [0],**kwargs))
+
+TL_kwargs['color'] = 'green'
+TL_kwargs.pop('edgecolor')
+legend_elements.append(Line2D([0], [0],**TL_kwargs))
+
+
+AC_kwargs['color'] = 'k'
+AC_kwargs.pop('edgecolor')
+legend_elements.append(Line2D([0], [0],**AC_kwargs))
+
+
+db_kwargs['color'] = 'red'
+db_kwargs.pop('edgecolor')
+legend_elements.append(Line2D([0], [0],**db_kwargs))
+
+ax.legend(handles=legend_elements, loc='lower right',fontsize=labelFontSize,ncol=1)
+pad=1e4*bigLine
+ax.set_ylim(LatLines.geometry.bounds.miny.min()-pad,LatLines.geometry.bounds.maxy.max()+pad)
+ax.set_xlim(LatLines.geometry.bounds.minx.min()-pad,LatLines.geometry.bounds.maxx.max()+pad)
+me.scalebar(ax,distance=1e6,pos='lower left',label='500 km',fontsize=labelFontSize)
+# plt.title(r'Eddy Covariance Sites North of 60$^{\circ}$')
+ax.axis('off')
+a=1
+```
+
+
+```{python}
+#| echo: False
+#| label: fig-EC1
+#| fig-cap: "Eddy covariance system with open path CO<sub>2</sub> and CH<sub>4</sub> sensors."
+#| fig-width: 100%
+import rawpy
+import imageio
+with rawpy.imread('G:/.shortcut-targets-by-id/1YLWq-5NMTYnDhdeL81TubtWXxOw4vmOm/SwissCheeseLake2024/DJI_20240719204941_0216_D.DNG') as raw:
+    rgb = raw.postprocess()
+  
+fig,ax=plt.subplots(figsize=(10,10))
+ax.imshow(rgb)
+ax.axis('off')
+a=1
+```
+
+
+</div>
+
+
+# {.col-3 style="grid-row: span 4;"} 
+
+
+## Methodology 
+
+<div id="half">
+
+To reduce the uncertainties regarding the trajectory of greenhouse gas fluxes in the delta, an EC system was installed in mid-summer 2024 at a sedge wetland site underlain by thin continuous permafrost which is representative of the outer delta area. 
+
+* This compliments
+* Some things
+
+</div>
+
+```{python}
+#| echo: false
+#| label: fig-mac-delta
+#| fig-cap: "Eddy covariance sites and communities in the Mackenzie Delta Region.  Map corresponds to the inset in @fig-pan-arc"
+#| fig-width: 100%
+
+# plt.figure(figsize=(4,4))
+# plt.plot([1,2],[1,2])
+
+import geodatasets
+import contextily as cx
+import matplotlib.patheffects as PathEffects
+
+communities = gpd.GeoDataFrame(index=[0,1,2],data={'Name':['Inuvik','Aklavik','Tuktoyaktuk']},geometry=gpd.points_from_xy(x=[-133.723819,-135.007480, -133.028379],y=[68.361515,68.221517,69.432860]),crs='WGS84')
+communities = communities.to_crs(epsg=32608)
+
+deltaBounds=deltaBounds.to_crs(epsg=32608)
+Sites = Sites.to_crs(epsg=32608)
+
+fig,ax=plt.subplots(figsize=(10,10))
+
+label = 'CO$_2$ & CH$_4$'
+marker = 'o'
+MS = 100
+kwargs={'color':color,'marker':marker,'markersize':MS,'edgecolor':'k'}
+Sites.loc[((Sites['CH4']==True))].plot(ax=ax,**kwargs)
+
+kwargs = {'color':'red','marker':marker,'markersize':MS,'edgecolor':'k'}
+communities.plot(ax=ax,**kwargs)
+
+
+bubble_width = 5
+kwargs={
+  'ha':'center',
+  'va':'bottom',
+  'fontsize':labelFontSize,
+  'xytext':(0,10),
+  'textcoords':'offset points'
+}
+for i, txt in communities.iterrows():
+  txt = ax.annotate(txt.Name, (txt.geometry.x, txt.geometry.y), **kwargs)
+  txt.set_path_effects([PathEffects.withStroke(linewidth=bubble_width, foreground='white')])
+
+Sites['Site_ID'] = Sites['Site_ID'].astype(str)
+kwargs['va'] = 'top'
+kwargs['ha'] = 'left'
+kwargs['xytext'] = (0,-10)
+
+for i, txt in Sites.iterrows():
+  txt = ax.annotate(txt.Site_ID.split('-')[-1], (txt.geometry.x, txt.geometry.y), **kwargs)
+  txt.set_path_effects([PathEffects.withStroke(linewidth=bubble_width, foreground='white')])
+
+ax.set_ylim(deltaBounds.geometry.bounds.miny[0],deltaBounds.geometry.bounds.maxy[0])
+ax.set_xlim(deltaBounds.geometry.bounds.minx[0],deltaBounds.geometry.bounds.maxx[0])
+
+access_token="pk.eyJ1IjoianVuZXNwYWNlYm9vdHMiLCJhIjoiY2twY3g4aXloMWFlcDJzbXN3aG95aG5uZiJ9.mFiJt0MIfL1MiJ2rB2xhKQ"
+tileurl = 'https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.png?access_token=' + str(access_token)
+
+cx.add_basemap(ax, source=tileurl,zoom=8,crs=Sites.crs)#Mapbox
+
+# cx.add_basemap(ax, source=cx.providers.Esri.WorldImagery,zoom=8)#ESRI
+ax.axis('off')
+a=1
+```
+
+
+
+The system measures the ecosystem-atmosphere exchange of methane and carbon dioxide and collects ancillary data that include solar radiation, air temperature, soil temperature profiles, and water table depth.  These data are used to understand the functional relationships driving greenhouse gas fluxes in the region and to estimate the greenhouse gas balance of the region.  The 2024 field season was an exploratory campaign, limited from the mid-July to mid-September using borrowed EC instrumentation.   A longer-term, multi-year campaign is planned to begin in June 2025 with the installation of newly procured EC sensors.
+
+# {.col-3} 
+
+![](G:/.shortcut-targets-by-id/1YLWq-5NMTYnDhdeL81TubtWXxOw4vmOm/SwissCheeseLake2024/PXL_20240912_234814480.jpg)
+
+### Results 
+
+This work is in its early stages and results to date are limited (Fig 1). The site is intended to provide a multi-year time series of methane and carbon dioxide fluxes for an ecosystem representative of the region. The primary long-term objectives of the station are: 1) to understand non-growing season fluxes, with particular focus on the snowmelt and freeze-up periods, 2) to estimate the ecosystem's net greenhouse gas balance by accounting for the disproportionally high global warming potential of methane fluxes, and 3) to serve as an anchor point from which further studies on the spatial variability and magnitude of methane emissions in the outer Mackenzie River Delta can be based.  An overview of preliminary findings from the 2024 deployment will be presented along with the study design for upcoming seasons that include the use of flux chambers to define contributions from various distinct landscape units, and a discussion of this work against the broader context of permafrost degradation and implications on feedbacks to climate change.
+
+## References
+
+<div id="refs" class="references"></div>
