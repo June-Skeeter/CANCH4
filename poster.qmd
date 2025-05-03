@@ -26,6 +26,16 @@ flogo1: images/logo_CA.jpg
 #| echo: false
 
 labelFontSize = 22
+
+custom_laea = '+proj=laea +lat_ts=0 +lat_0=90 +lon_0=-90 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs'
+
+
+source = 'Data/'
+Sites = pd.read_csv(source+'Arctic_EC_Towers.csv')
+Sites = gpd.GeoDataFrame(Sites,geometry=gpd.points_from_xy(Sites.Longitude, Sites.Latitude),crs='WGS1984')
+Sites = Sites.to_crs(custom_laea)
+Sites = Sites.loc[Sites['Latitude']>60.1]
+
 ```
 
 
@@ -47,15 +57,16 @@ Eddy covariance (EC) is one of the primary methods to monitor landscape-scale gr
 
 ### Limited Arctic Flux Observations
 
-There is sparse coverage of EC stations in the Arctic, outside of Scandinavia and Alaska as shown in @fig-pan-arc.
+There is sparse coverage of EC stations in the Arctic, outside of Scandinavia and Alaska as shown in @fig-pan-arc.  
 
-* EC stations are are difficult to opperate in remote environments due to maintenance and power demands.
-* Sites measuring CH<sub>4</sub> are even less common.
+* EC stations are are difficult to operate in remote environments due to maintenance and power demands.
+* Sites measuring CH<sub>4</sub> are even less common because CH<sub>4</sub> sensors are substantially increase cost, maintenance, and power detains.
+  + Only `{python} Sites.loc[((Sites['Country'] == 'Canada')&(Sites['CH4'] == True))]` stations with CH<sub>4</sub> observations in Canada.
 
 ```{python}
 #| echo: false
 #| label: fig-pan-arc
-#| fig-cap: "Eddy covariance sites above of 60&deg;N with at least one season of data. @pallandt_representativeness_2021"
+#| fig-cap: "Eddy covariance sites north of 60&deg; with at least one season of data. @pallandt_representativeness_2021"
 #| fig-width: 100%
 
 import pandas as pd
@@ -69,7 +80,6 @@ import numpy as np
 import pyproj
 
 
-custom_laea = '+proj=laea +lat_ts=0 +lat_0=90 +lon_0=-90 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs'
 
 ## Define bounds
 N = 360
@@ -98,11 +108,6 @@ polygon_geom = Polygon(zip(lon_point_list, lat_point_list))
 deltaBounds = gpd.GeoDataFrame(index=[0], crs='WGS84', geometry=[polygon_geom])   
 deltaBounds = deltaBounds.to_crs(custom_laea)
 
-source = 'Data/'
-Sites = pd.read_csv(source+'Arctic_EC_Towers.csv')
-Sites = gpd.GeoDataFrame(Sites,geometry=gpd.points_from_xy(Sites.Longitude, Sites.Latitude),crs='WGS1984')
-Sites = Sites.to_crs(custom_laea)
-Sites = gpd.clip(Sites,LatLines.loc[LatLines.index==60])
 
 coast = gpd.read_file(source+'cp_coast_la.shp').to_crs(custom_laea)
 coast = gpd.clip(coast,LatLines.loc[LatLines.index==60])
@@ -209,14 +214,15 @@ a=1
 # {.col-3 style="grid-row: span 4;"} 
 
 
-## Methodology 
+## Study Sites 
 
 <div id="half">
 
-To reduce the uncertainties regarding the trajectory of greenhouse gas fluxes in the delta, an EC system was installed in mid-summer 2024 at a sedge wetland site underlain by thin continuous permafrost which is representative of the outer delta area. 
+The Mackenzie River Delta and surrounding upland terrain are shown in @fig-mac-delta.  
 
-* This compliments
-* Some things
+* The region straddles the treeline and has a complex geologic history.
+* The region is the only part of the Canadian Arctic with road access. 
+
 
 </div>
 
@@ -249,6 +255,15 @@ Sites.loc[((Sites['CH4']==True))].plot(ax=ax,**kwargs)
 
 kwargs = {'color':'red','marker':marker,'markersize':MS,'edgecolor':'k'}
 communities.plot(ax=ax,**kwargs)
+
+
+TL_kwargs = {'color':'None',
+  'edgecolor':'green',
+  'linewidth':littleLine,
+  'label':'Arctic Treeline',
+  'linestyle':':'}
+Arctic = Arctic.to_crs(epsg=32608)
+Arctic.plot(ax=ax,**TL_kwargs)
 
 
 bubble_width = 5
@@ -286,6 +301,10 @@ a=1
 ```
 
 
+To reduce the uncertainties regarding the trajectory of greenhouse gas fluxes in the delta, an EC system was installed in mid-summer 2024 at a sedge wetland site underlain by thin continuous permafrost which is representative of the outer delta area. 
+
+* This compliments
+* Some things
 
 The system measures the ecosystem-atmosphere exchange of methane and carbon dioxide and collects ancillary data that include solar radiation, air temperature, soil temperature profiles, and water table depth.  These data are used to understand the functional relationships driving greenhouse gas fluxes in the region and to estimate the greenhouse gas balance of the region.  The 2024 field season was an exploratory campaign, limited from the mid-July to mid-September using borrowed EC instrumentation.   A longer-term, multi-year campaign is planned to begin in June 2025 with the installation of newly procured EC sensors.
 
